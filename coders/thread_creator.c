@@ -6,10 +6,10 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/13 15:21:26 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/13 15:38:19 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/13 16:11:52 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
 
-pthread_t   *ptrhead_matrix_generator()
+pthread_t	*ptrhead_matrix_generator(void);
