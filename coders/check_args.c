@@ -12,6 +12,26 @@
 
 #include "codexion.h"
 
+//Recorre argv[1]..argv[7] (los 7 numericos, el schedule en argv[8]
+//no pasa por aqui) y comprueba cada uno con is_valid_number antes de
+//que fill_struct llame a atoi.
+static int	check_numeric_args(char **argv)
+{
+	int	i;
+
+	i = 1;
+	while (i <= 7)
+	{
+		if (!is_valid_number(argv[i]))
+		{
+			printf("argv[%d] is not a valid number: %s\n", i, argv[i]);
+			return (0);
+		}
+		i++;
+	}
+	return (1);
+}
+
 static void	fill_struct(char **argv, t_args *type)
 {
 	type->number_of_coders = atoi(argv[1]);
@@ -57,6 +77,8 @@ t_args	*cheack_args(char **argv, int argc)
 	t_args	*args;
 
 	if (argc != 9)
+		return (NULL);
+	if (!check_numeric_args(argv))
 		return (NULL);
 	args = malloc(sizeof(t_args));
 	if (!args)

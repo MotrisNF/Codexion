@@ -1,328 +1,169 @@
-# Codexion — Guía de trabajo
+# Codexion — Qué queda por hacer
 
-> Generado a partir de `es.subject.pdf` y del estado real del código en `/home/saperez-/Milestone3/Codexion` (repo git = esta misma carpeta, remote `origin` → `git@github.com:MotrisNF/Codexion.git`).
-> Esto es una **guía de estructuras y firmas**, no una implementación: te digo qué structs/campos/funciones necesitas y qué debe cumplir cada una, pero la lógica interna (los `if`, los `while`, el orden de las líneas) la escribes tú.
-
----
-
-## 0. Resumen del subject (referencia rápida)
-
-- `N` personas (`number_of_coders`) = `N` hilos. `N` dongles en mesa circular (si `N==1`, 1 dongle).
-- Ciclo por persona: **compilar → depurar → refactorizar → compilar...**
-- Compilar exige **ambos dongles** (izq. y der.) a la vez, durante `time_to_compile` ms.
-- Al terminar de compilar: libera ambos dongles (entran en `dongle_cooldown` ms de cooldown), pasa a depurar (`time_to_debug` ms), luego a refactorizar (`time_to_refactor` ms), y vuelve a pedir dongles.
-- Si no **empieza** a compilar antes de `time_to_burnout` ms desde el inicio de su última compilación (o desde el arranque) → **burned out**, la simulación se para.
-- Arbitraje entre solicitantes del mismo dongle, según `scheduler`:
-  - `fifo`: orden de llegada de la solicitud.
-  - `edf`: menor `deadline = last_compile_start_ms + time_to_burnout` primero.
-- Hilo **monitor** separado, detecta agotamiento con precisión ≤ 10 ms.
-- Parada también si **todas** las personas llevan `>= number_of_compiles_required` compilaciones.
-- Log serializado con mutex (nunca mensajes cortados o mezclados).
-- **Prohibidas variables globales** → todo pasa por puntero a un struct raíz creado en `main`.
-- Cola de prioridad (heap binario) implementada a mano (C89, sin librería) para el scheduler FIFO/EDF.
-
-### Argumentos (8, todos obligatorios, en este orden)
-```
-./codexion number_of_coders time_to_burnout time_to_compile time_to_debug \
-           time_to_refactor number_of_compiles_required dongle_cooldown scheduler
-```
-
-### Funciones autorizadas (única lista permitida)
-```
-pthread_create, pthread_join, pthread_mutex_init, pthread_mutex_lock,
-pthread_mutex_unlock, pthread_mutex_destroy, pthread_cond_init,
-pthread_cond_wait, pthread_cond_timedwait, pthread_cond_broadcast,
-pthread_cond_destroy, gettimeofday, usleep, write, malloc, free,
-printf, fprintf, strcmp, strlen, atoi, memset
-```
-> No hay `pthread_cond_signal` → tendrás que usar `pthread_cond_broadcast`.
-> No hay `qsort`, `sprintf`, `snprintf`, `calloc`, `realloc`, `strtol` → no están disponibles.
-
-### Entrega
-- `Makefile`, `*.c`, `*.h` **dentro de `coders/`** (ya existe en la raíz del repo).
-- `Makefile`: reglas `$(NAME)`, `all`, `clean`, `fclean`, `re` (+ `bonus` si aplica), compilado con `cc -Wall -Wextra -Werror -pthread`, sin relink innecesario.
-- `libft` no permitida en obligatoria.
-- `README.md` en la **raíz** del repo (no dentro de `coders/`) con las 6 secciones descritas en §11.
-- Solo se evalúa el contenido del repo git (`origin/main`).
+> Este documento sustituye a la versión anterior. Ya no describe "todo el proyecto desde cero": describe el estado real tras completar los puntos 1-4 (header, `heap.c`, `validate_number.c`, `dongle.c`), las decisiones de diseño ya tomadas en ese código, y todo lo que queda pendiente, fase a fase. Deliberadamente no contiene código: es una guía de responsabilidades y decisiones, la implementación la escribes tú.
 
 ---
 
-## 1. Estado real del código (auditado línea a línea)
+## 0. Lo que ya está hecho (puntos 1-4)
 
-Repo raíz = `/home/saperez-/Milestone3/Codexion` (ya es el repo git correcto). **Ya no existe una subcarpeta `Github/`** — cualquier referencia a esa ruta en versiones anteriores de este plan está obsoleta.
+- `coders/codexion.h`: structs completos (`t_args`, `t_heap_node`, `t_heap`, `t_dongle`, `t_coder`, `t_sim`) y todos los prototipos, incluidos los de funciones que aún no existen (`log_event`).
+- `coders/heap.c` + `coders/heap_utils.c`: min-heap binario completo y probado (inserción/extracción en orden correcto). Está partido en dos archivos porque `heap.c` solo (API pública + reordenamiento) tenía 8 funciones y el límite de Norma es 5 por archivo: `heap.c` se quedó con `heap_create/destroy/is_empty/push/pop_min` (la API que usa el resto del proyecto) y `heap_utils.c` con `heap_swap/heap_sift_up/heap_sift_down` (el reordenamiento interno, ya no `static` porque ahora vive en otro archivo).
+- `coders/validate_number.c`: `is_valid_number` completo y probado (rechaza vacíos, no numéricos, espacios, overflow de `int`; acepta signo opcional y los límites exactos `INT_MIN`/`INT_MAX`).
+- `coders/check_args.c`: ahora valida los 7 argumentos numéricos con `is_valid_number` antes de convertirlos con `atoi`.
+- `coders/dongle.c` + `coders/dongle_acquire.c`: mismo motivo de split que el heap (10 funciones no cabían en un archivo). `dongle.c` tiene el ciclo de vida (`dongle_create/destroy/release`, `sim_is_stopped`, `get_now_ms`); `dongle_acquire.c` tiene la lógica de adquisición (`dongle_acquire`, `dongle_acquire_pair`, y sus helpers `compute_key`/`can_take_now`/`order_dongles`, estos sí `static` porque solo se usan ahí dentro).
+- Cada `.c` compila individualmente con `-Wall -Wextra -Werror -pthread` sin avisos, y **`norminette coders/` da "OK!" en los 9 archivos**. **El binario todavía no enlaza**: `dongle_acquire.c` llama a `log_event`, que solo está declarada (en el header), no implementada. Eso es lo primero que desbloquea todo lo demás (fase 5).
 
-| Archivo | Estado real | Qué falta |
-|---|---|---|
-| `coders/codexion.h` | `t_args` completo (8 campos). `t_coder` con 10 campos, pero sin `pthread_t`, sin `id`, sin punteros a dongle (usa `int left_dongle`/`rigth_dongle` en vez de punteros a struct), sin puntero al struct raíz, sin mutex propio. No existen `t_dongle`, `t_sim`, `t_heap`. | Definir los structs de §2 y corregir `t_coder` (incluye el typo `rigth_dongle`). |
-| `coders/check_args.c` | `fill_struct` usa `atoi` puro. `check_struct_values` valida `<=0` y el valor de `schedule`. | No detecta no-numéricos (`"12x"`, `"1.5"`, `" 12"`) ni overflow. Falta `is_valid_number()` (§9). |
-| `coders/main.c` | Llama a `cheack_args`, imprime "Todo ok.", libera y sale. | No crea `t_sim`, no lanza hilos, no llama a `pthread_join`, no hay limpieza de mutexes. |
-| `coders/thread_creator.c` | Una única línea: `pthread_t *ptrhead_matrix_generator()` sin cuerpo ni `;`. **No compila.** | Implementar de cero (§4). |
-| `Makefile` | No existe. | Crear con las reglas exigidas (§10). |
-| `README.md` | No existe. | Crear en la raíz (§11). |
-| `.gitignore` | Existe (`a.out`, `*.o`). | OK, no tocar. |
-| Dongles / cooldown / scheduler / heap / monitor / logging | No implementado. | Es el ~90% restante del proyecto. |
+### Decisiones de diseño ya tomadas (respétalas en el código que falta)
 
-**Nota de compilación inmediata**: `thread_creator.c` tal cual **rompe el build** ahora mismo (`pthread_t *ptrhead_matrix_generator()` sin `{}` ni `;` es un error de sintaxis). Arréglalo antes de crear el `Makefile`, o fallará en cuanto exista.
+Estas decisiones están tomadas y el código de `dongle.c` depende de ellas. Si algo de esto no encaja con lo que tenías en mente, dímelo antes de seguir para no tener que deshacer trabajo:
 
----
-
-## 2. Fase 1 — Structs necesarios (sin variables globales)
-
-Como las variables globales están prohibidas, necesitas un struct raíz creado en `main` cuyo puntero se pase a cada hilo. Campos que te faltan por struct (añádelos a `codexion.h`, y corrige `t_coder`, que hoy usa `int` en vez de punteros):
-
-**`t_dongle`** (uno por posición en la mesa, `N` en total):
-- `id` (`int`) — identificador estable (0..N-1), lo necesitarás para el orden de adquisición anti-deadlock.
-- estado libre/ocupado (`int`).
-- `available_at_ms` (`long`) — instante a partir del cual deja de estar en cooldown.
-- `pthread_mutex_t` propio.
-- `pthread_cond_t` propio.
-- alguna estructura de cola de espera (heap, ver §3) asociada a este dongle.
-
-**`t_coder`** (uno por hilo/persona, corrige el actual):
-- `id` (`int`).
-- `pthread_t` del hilo.
-- puntero a su dongle izquierdo y puntero a su dongle derecho (no `int`, sino `t_dongle *`).
-- `last_compile_start_ms` (`long`).
-- mutex propio para proteger ese campo (el monitor lo lee, el coder lo escribe).
-- `compilations_done` (`int`).
-- puntero al struct raíz de simulación.
-
-**`t_sim`** (struct raíz, uno solo, creado en `main`):
-- puntero a `t_args`.
-- array de `t_dongle`.
-- array de `t_coder`.
-- `pthread_t` del hilo monitor.
-- mutex de log.
-- flag de parada (`int`) + mutex propio para ese flag.
-- `start_time_ms` (`long`) — base de todos los timestamps del log.
-
-**`t_heap`** (cola de prioridad, ver §3): un array de nodos, cada nodo con una clave (`long`, orden de llegada o deadline según scheduler) y el `id` del coder al que pertenece, más contadores de tamaño/capacidad.
-
-Notas de diseño (para que decidas tú la implementación, no un algoritmo cerrado):
-- El dongle izquierdo/derecho de cada coder depende de su posición en la mesa circular; decide tú cómo indexarlo a partir de `id` y `N`.
-- Si `N == 1` solo hay un dongle en la mesa — decide cómo representas ese caso especial en los punteros izquierdo/derecho.
-- El heap de espera puede ser uno por dongle (recomendado) o un diseño distinto — pero documenta tu elección.
-
-Norma (verifica los límites exactos con el checker de tu campus, pero como referencia): máx. ~25 líneas por función, máx. 4 parámetros, máx. 5 variables declaradas por función → vas a necesitar bastantes funciones pequeñas de init/destroy/getter para cada struct.
+1. **Arbitraje por dongle, no global.** Cada `t_dongle` tiene su propio `t_heap *waiting`. No existe un contador de llegada global en `t_sim`: el contador `arrival_counter` vive dentro de cada `t_dongle` y solo cuenta las solicitudes de ese dongle en concreto. Esto es coherente con el subject ("arbitraje entre solicitantes del mismo dongle").
+2. **La clave del heap depende del scheduler**: en `fifo` es el contador de llegada del propio dongle; en `edf` es `last_compile_start_ms + time_to_burnout` del coder. Se decide dentro de `dongle_acquire`, comparando `coder->simulation->args->schedule` contra `"edf"`.
+3. **Orden anti-deadlock**: siempre se adquiere primero el dongle con `id` más bajo. Es el mismo criterio para todos los coders, así que no puede haber espera circular.
+4. **Caso `number_of_coders == 1`**: se asume que `coder->left` y `coder->right` apuntarán al mismo `t_dongle`. `dongle_acquire_pair` ya contempla esto (si `first == second`, solo adquiere una vez) — pero **quien llame a `dongle_release` para liberar el par (la rutina del coder, fase 6) tiene que aplicar el mismo criterio**: una sola llamada a `dongle_release` si son el mismo dongle, dos si son distintos. Si no se respeta esto, se libera dos veces el mismo mutex/cooldown y el comportamiento queda indefinido.
+5. **`sim_is_stopped` es la única forma correcta de leer `stop_flag`** desde cualquier hilo que no sea el monitor. No leas `sim->stop_flag` directamente en ningún sitio nuevo: siempre a través de esta función (ya bloquea `mutex_stop_flag` por ti).
+6. **El cooldown usa su propio reloj** (`gettimeofday` sin relacionarlo con `start_time_ms`). El timestamp que se loggea sí usa `start_time_ms` como base (eso lo hace `now_ms`, todavía no implementada). Son dos relojes con propósitos distintos, no los mezcles.
+7. **`compute_key` para `fifo` incrementa el contador del dongle mientras el mutex de ese dongle ya está bloqueado** (lo hace `dongle_acquire` antes de llamarla). Si en algún sitio nuevo necesitas leer o tocar `arrival_counter`, hazlo siempre con ese mutex bloqueado.
 
 ---
 
-## 3. Fase 1b — Cola de prioridad para el arbitraje (`coders/heap.c`)
+## 1. Fase 5 — Logging serializado (`coders/log.c`)
 
-**Para qué sirve, en una frase**: cuando varias personas piden el mismo dongle a la vez, algo tiene que decidir a quién se lo dan primero. Con `fifo` es fácil (el que llegó antes). Con `edf` hay que dar siempre el dongle a quien tenga el **deadline más próximo** (`last_compile_start + time_to_burnout`), y eso cambia según quién va llegando y a quién se le va sirviendo. El subject pide que esto se resuelva con una cola de prioridad (heap) porque en tu lista de funciones autorizadas no hay `qsort` para mantener nada ordenado de otra forma.
+Es el siguiente paso obligatorio: sin esto no enlaza el binario, porque `dongle.c` ya llama a `log_event`.
 
-**No es una librería genérica**: es solo un array de tamaño fijo — como mucho esperan el mismo dongle `number_of_coders` personas a la vez, así que `capacity = number_of_coders` ya te vale y no necesitas `realloc` (que tampoco está autorizado). Con 3 operaciones te sobra:
+Necesitas dos funciones, ya declaradas en el header:
+- Una que calcule el timestamp actual en milisegundos relativo al arranque de la simulación (la diferencia entre "ahora" y `sim->start_time_ms`).
+- Una que imprima una línea de log para un evento de un coder concreto.
 
-```c
-t_heap	*heap_create(int capacity);
-void	heap_destroy(t_heap *heap);
-int		heap_push(t_heap *heap, long key, int coder_id);
-int		heap_pop_min(t_heap *heap);   // devuelve el coder_id de la clave mínima
-int		heap_is_empty(t_heap *heap);
-```
-- `key`: para `fifo` usa un contador de orden de llegada; para `edf` usa el deadline (`last_compile_start + time_to_burnout`). Es el mismo heap para los dos schedulers, solo cambia qué metes como `key`.
-- La inserción y la extracción reordenan el array (típico "subir"/"bajar" el elemento movido); sepáralo en una función auxiliar por cada una para no pasarte del límite de líneas de Norma.
-- Alternativa mínima si un heap "de verdad" te bloquea: un array simple donde `push` añade al final y `pop_min` recorre buscando la clave menor (O(n) en vez de O(log n)). Con `number_of_coders` pequeño el rendimiento no es el problema — pero el subject pide explícitamente la estructura heap, así que documenta en el README si te desvías de eso y por qué.
-- Pruébalo aislado antes de integrarlo: un `main` de prueba temporal que empuje varias claves y compruebe que `heap_pop_min` las devuelve en orden ascendente.
+Puntos a decidir y respetar:
+- Debe ser el **único punto del proyecto** donde se hace `printf`/`write` para los eventos de la simulación (aparte de los mensajes de error de argumentos, que van antes de crear la simulación).
+- Tiene que estar protegido por `mutex_log`: lock, imprimir, unlock — nada más dentro de la sección crítica, para no retener el mutex más de lo necesario.
+- Formato de línea exigido por el subject: el timestamp en ms, el identificador del coder, y el texto del evento.
+- Eventos literales a usar tal cual los pide el subject: `"has taken a dongle"`, `"is compiling"`, `"is debugging"`, `"is refactoring"`, `"burned out"`. `dongle_acquire` ya usa el primero.
+- Decide si el identificador del coder que se imprime es `id` 0-based o 1-based, y sé consistente en todo el proyecto (incluida la rutina del coder y el monitor, que loggearán el resto de eventos).
+- Pruébalo con varios hilos lanzando `log_event` a la vez antes de seguir, para confirmar que ninguna línea sale cortada o mezclada con otra.
 
 ---
 
-## 4. Fase 2/3 — Dongles y rutina del coder
+## 2. Fase 6 — Rutina del coder (`coders/coder_routine.c`)
 
-### 4.1 Adquisición de dongles (evitar deadlock)
+Esta es la función que ejecuta cada hilo coder (la firma la exige `pthread_create`: recibe y devuelve `void *`, y el argumento real por dentro es un `t_coder *`).
 
-Problema clásico de los filósofos: si todos los hilos cogen su dongle izquierdo primero y esperan el derecho, el sistema se bloquea. Tienes que romper esa simetría con algún criterio (por ejemplo, basado en el `id` de cada dongle, o en un mutex/orden de petición distinto) — decide y justifica tu estrategia en el README (§11).
+Tiene que implementar el ciclo completo de una persona, repitiéndolo hasta que la simulación se pare:
 
-Funciones que necesitas en `coders/dongle.c` (firma y responsabilidad, sin cuerpo):
+1. Comprobar `sim_is_stopped` al principio de cada vuelta del ciclo — si ya está parada, terminar sin más.
+2. Registrar el instante en el que empieza a intentar compilar, en `last_compile_start_ms`. **Recuerda**: este campo lo lee el monitor desde otro hilo, así que la escritura va protegida por `coder->mutex` (aunque la propia rutina, al ser el único escritor, no necesite el mutex para leerse a sí misma después).
+3. Llamar a `dongle_acquire_pair` para conseguir ambos dongles. Si devuelve que la simulación se ha parado mientras esperaba, salir del ciclo sin loggear nada más de compilación.
+4. Loggear `"is compiling"` y esperar `time_to_compile` ms.
+5. Liberar los dos dongles con `dongle_release`, respetando el caso especial de `number_of_coders == 1` que se explica en el punto 0.4 de arriba.
+6. Incrementar `compilations_done`, protegido también por `coder->mutex` (mismo motivo: el monitor lo lee).
+7. Loggear `"is debugging"` y esperar `time_to_debug` ms.
+8. Loggear `"is refactoring"` y esperar `time_to_refactor` ms.
+9. Volver al paso 1.
 
-```c
-int		dongle_acquire(t_dongle *dongle, t_coder *coder);
-```
-Responsabilidad: bloquear el hilo llamante hasta que el dongle esté libre, haya pasado su cooldown, y le corresponda según el `scheduler` (`fifo`/`edf`) — o hasta que la simulación se pare. Debe registrar la solicitud de alguna forma (heap de espera del dongle) y revalidar la condición completa cada vez que se despierta (para evitar wakeups espurios y evitar que dos coders se lleven el mismo dongle). Al conseguirlo, debe loggear `"has taken a dongle"`. Devuelve un código para distinguir "conseguido" de "la simulación se ha parado mientras esperaba".
-
-```c
-int		dongle_acquire_pair(t_coder *coder);
-```
-Responsabilidad: obtener los dos dongles del coder (izquierdo y derecho) aplicando tu criterio anti-deadlock, gestionando qué hacer si consigue el primero pero no el segundo (o la simulación se para entre medias).
-
-```c
-void	dongle_release(t_dongle *dongle, t_coder *coder);
-```
-Responsabilidad: marcar el dongle como libre, fijar su nuevo `available_at_ms` (ahora + `dongle_cooldown`), y despertar a quien esté esperando por él (`pthread_cond_broadcast`, no hay `signal` disponible).
-
-Ten en cuenta: cada espera con `pthread_cond_wait`/`pthread_cond_timedwait` debe volver a comprobar todas sus condiciones al despertar, incluido el flag de parada de la simulación.
-
-### 4.2 Rutina del hilo coder (`coders/coder_routine.c`)
-
-```c
-void	*coder_routine(void *arg);   // arg = t_coder*, firma exigida por pthread_create
-```
-Debe implementar el ciclo completo de una persona, repitiendo hasta que la simulación se pare:
-- comprobar el flag de parada al inicio de cada vuelta,
-- registrar el instante en que empieza a intentar compilar (para que el monitor calcule el burnout),
-- conseguir ambos dongles (`dongle_acquire_pair`),
-- loggear y esperar `time_to_compile` ms,
-- liberar ambos dongles,
-- contabilizar la compilación,
-- loggear y esperar `time_to_debug` ms,
-- loggear y esperar `time_to_refactor` ms.
-
-Detalles a decidir tú: cómo trocear las esperas (`usleep`) para poder reaccionar rápido si el monitor activa el flag de parada a mitad de una espera larga; bajo qué mutex proteges la escritura/lectura de `last_compile_start_ms` y `compilations_done` (el monitor los lee desde otro hilo).
+Detalle importante a decidir tú: las esperas largas (`time_to_compile`, `time_to_debug`, `time_to_refactor`) probablemente no deberían ser un único `usleep` de golpe, porque si el monitor activa el flag de parada a mitad de esa espera, el hilo no se entera hasta que termine. Trocea la espera en fragmentos pequeños (por ejemplo, de 1 ms) comprobando `sim_is_stopped` entre fragmento y fragmento, para que la simulación pueda parar con rapidez razonable en cualquier momento.
 
 ---
 
-## 5. Fase 4 — Hilo monitor (`coders/monitor.c`)
+## 3. Fase 7 — Hilo monitor (`coders/monitor.c`)
 
-```c
-void	*monitor_routine(void *arg);   // arg = t_sim*
-```
-Responsabilidad, en bucle, con un sondeo lo bastante frecuente para cumplir el margen de 10 ms (piensa en el orden de 1 ms, ajusta según pruebas):
-- para cada coder, calcular si ha pasado más de `time_to_burnout` ms desde su `last_compile_start_ms` sin haber empezado a compilar → si es así, loggear `"burned out"`, activar el flag de parada y despertar a todos los hilos que puedan estar esperando en algún `cond_wait`.
-- comprobar también si todos los coders han alcanzado `number_of_compiles_required` → si es así, activar el flag de parada (sin loggear "burned out").
-- decidir la frecuencia de sondeo (`usleep`) que cumpla el margen de precisión sin consumir CPU en exceso.
+Un único hilo, separado de los coders, que en bucle:
 
-Necesitarás alguna forma de despertar a los hilos que están en `cond_wait` sobre condvars de dongles distintas cuando el monitor decide parar — piensa cómo vas a alcanzar todas esas condvars desde un único hilo monitor.
+1. Para cada coder, calcula si ha pasado más de `time_to_burnout` ms desde su `last_compile_start_ms` sin que haya **empezado** a compilar de nuevo. Esta lectura de `last_compile_start_ms` sí necesita el `coder->mutex` del coder correspondiente, porque aquí el monitor es un hilo distinto al que escribe el campo.
+   - Si algún coder se ha agotado: loggear `"burned out"` para ese coder, **antes** de activar el flag de parada (el orden importa, lo pide el subject).
+2. Comprueba también si **todos** los coders han alcanzado `number_of_compiles_required` compilaciones. Si es así, activa el flag de parada directamente, sin loggear "burned out" — es un final por éxito, no por agotamiento.
+3. Al activar el flag de parada (por cualquiera de los dos motivos), tiene que despertar a todos los hilos que puedan estar bloqueados en un `pthread_cond_wait` sobre la condvar de **cualquier** dongle — no solo uno. Como cada dongle tiene su propia condvar, esto implica recorrer el array de dongles y hacer `pthread_cond_broadcast` sobre cada uno.
+4. El sondeo tiene que ser lo bastante frecuente para detectar el burnout con un margen de 10 ms como mucho — piensa en un `usleep` del orden de 1 ms entre vuelta y vuelta del bucle, y ajusta con pruebas reales si hace falta más o menos precisión.
+5. El propio monitor debe dejar de iterar en cuanto el flag de parada esté activo (por su propia comprobación o porque ya lo puso él mismo), para poder terminar y ser unido con `pthread_join`.
 
----
-
-## 6. Fase 5 — Logging serializado (`coders/log.c`)
-
-```c
-long	now_ms(t_sim *sim);   // timestamp actual menos el instante de arranque
-void	log_event(t_sim *sim, int coder_id, const char *event);
-```
-- Un único punto de `printf`/`write` en todo el proyecto, protegido por el mutex de log.
-- Formato de línea exigido por el subject: `timestamp_in_ms X <evento>`.
-- Eventos literales a usar (coinciden con el subject palabra por palabra): `"has taken a dongle"`, `"is compiling"`, `"is debugging"`, `"is refactoring"`, `"burned out"`.
-- Decide si `X` es el `id` 0-based o 1-based y sé consistente en todo el log; documenta tu elección si el subject no lo especifica.
-- Verifica manualmente con muchos coders y tiempos cortos que ninguna línea sale cortada o mezclada con otra.
+Cuidado con el orden de bloqueo de mutex aquí: si necesitas leer varios campos de varios coders en la misma vuelta, hazlo coder por coder (lock, lee, unlock) en vez de mantener varios mutex bloqueados a la vez — no hay ninguna razón para retenerlos simultáneamente y así te evitas cualquier riesgo de deadlock cruzado con los mutex de los dongles.
 
 ---
 
-## 7. Fase 6 — Condiciones de parada (resumen operativo)
+## 4. Fase 8 — `main.c` y `thread_creator.c` reales
 
-Dos formas de fijar el flag de parada, ambas decididas solo por el **monitor**:
-1. Agotamiento de alguien → loggear `"burned out"` primero, luego parar, luego despertar a todos.
-2. Éxito global (todos alcanzan `number_of_compiles_required`) → parar directo, sin loggear burnout.
+Ahora mismo `main.c` solo valida argumentos y sale; `thread_creator.c` solo declara una función sin definirla. Aquí se junta todo:
 
-Todas las esperas (`cond_wait`/`timedwait`) deben revisar el flag de parada al despertar para poder salir de verdad. Tras salir de `coder_routine`, cada hilo simplemente termina; `main` debe unir (`pthread_join`) los `N` coders y el monitor antes de liberar cualquier memoria.
+1. Construir el struct raíz `t_sim`: reservar y rellenar el array de `N` dongles (con `dongle_create`, pasando `capacity = number_of_coders` a cada uno) y el array de `N` coders, inicializar `mutex_log`, `mutex_stop_flag`, `stop_flag = 0`, y `start_time_ms` (con `gettimeofday`, como referencia para `now_ms`).
+2. Asignar a cada coder su `left`/`right` según su posición en la mesa circular a partir de su `id` y de `N` — decide tú la fórmula de indexación (típicamente algo como "el dongle a tu izquierda es el que tiene tu mismo índice, el de la derecha es el siguiente módulo N", pero revísalo con cuidado para el caso `N == 1`, que ya vimos que necesita `left == right`).
+3. Lanzar los `N` hilos coder con `pthread_create`, pasando un puntero a cada `t_coder` (que a su vez apunta al `t_sim` raíz), y lanzar el hilo monitor con `pthread_create` pasando el `t_sim` raíz.
+4. Hacer `pthread_join` de los `N` coders y del monitor, **todos, sin excepción**, antes de liberar nada.
+5. Limpiar todo en orden inverso a como se creó: destruir cada dongle (`dongle_destroy`, que ya libera su heap interno), liberar los arrays de punteros, destruir los mutex propios de cada coder, destruir `mutex_log` y `mutex_stop_flag`, liberar el struct `t_sim` y el `t_args`.
+6. Gestionar los caminos de error de inicialización: si algo falla a mitad de crear los dongles o los coders (por ejemplo un `malloc` que devuelve `NULL`), libera lo que ya se había reservado antes de salir, no dejes memoria colgada ni un `pthread_create` a medias sin su `join`.
 
----
-
-## 8. Fase 7 — Memoria y errores (checklist de verificación)
-
-- [ ] Cada `pthread_mutex_init`/`pthread_cond_init` tiene su `_destroy` correspondiente.
-- [ ] Cada `malloc` tiene su `free`, incluidos los caminos de error (si algo falla a mitad de la inicialización, libera lo ya reservado antes de salir).
-- [ ] `pthread_join` se llama para **todos** los hilos creados, sin excepción, antes de liberar memoria.
-- [ ] Ejecuta con `valgrind --leak-check=full --show-reachable=yes ./codexion ...` y confirma que no hay leaks.
-- [ ] Ejecuta con `-fsanitize=thread` (build de test aparte) o `helgrind` para detectar data races.
-- [ ] El subject dice que un segfault/bus error/double free en evaluación implica **nota 0** — trátalo como criterio de bloqueo.
+Este es también el momento de poner nombre real a lo que hoy es solo un stub en `thread_creator.c` — decide tú si prefieres tener toda la creación de hilos en una función central ahí, o repartirla entre `main.c` y `thread_creator.c` (por ejemplo, una función que cree solo los coders y otra que cree el monitor, para no pasarte del límite de líneas de Norma en una única función).
 
 ---
 
-## 9. Fase 8 — Validación de argumentos (`check_args.c`)
+## 5. Fase 9 — Makefile
 
-Función nueva a añadir (en `check_args.c` o en un archivo aparte, p. ej. `validate_number.c`):
-```c
-int	is_valid_number(const char *str);   // 1 si es un entero válido (con overflow check), 0 si no
-```
-Qué debe rechazar, exactamente:
-- cadena vacía,
-- cualquier carácter que no sea dígito (aparte de un signo opcional al principio),
-- overflow de `int` (sin usar `strtol`, que no está en la lista de funciones autorizadas — decide tú una estrategia de acumulación/comparación manual).
+No existe todavía. Va dentro de `coders/`, con:
+- Una variable `NAME` con el nombre del binario.
+- Reglas `all`, `$(NAME)`, `clean` (borra los `.o`), `fclean` (borra también el binario), `re` (`fclean` + `all`).
+- Compilador `cc`, flags `-Wall -Wextra -Werror -pthread`.
+- Compilación incremental: que un `make` después de tocar un solo `.c` no recompile todos los demás, y que tocar `codexion.h` sí invalide todos los objetos (todos los `.c` dependen de él).
+- Si en algún momento añades bonus, una regla `bonus` aparte que compile archivos `*_bonus.c/.h` independientes de la parte obligatoria.
 
-Debe llamarse antes de `atoi` para los 7 argumentos numéricos (todos menos el scheduler). Mantén el `argc != 9` como primera comprobación (ya está bien en `cheack_args`).
+Verifica `make`, `make clean`, `make fclean` y `make re` ejecutados desde dentro de `coders/`.
 
 ---
 
-## 10. Fase 9 — Makefile
+## 6. Fase 10 — Plan de pruebas
 
-Archivo: `coders/Makefile`. Requisitos exigidos por el subject, no una implementación completa:
-- variable `NAME` con el nombre del binario,
-- reglas `all`, `$(NAME)`, `clean` (borra `.o`), `fclean` (borra también el binario), `re` (`fclean` + `all`),
-- compilador `cc`, flags `-Wall -Wextra -Werror -pthread`,
-- compilación incremental (solo recompila los `.c` que cambiaron, no relink completo cada vez — depende de `codexion.h` para invalidar objetos si cambia la cabecera),
-- si añades bonus, una regla `bonus` que compile los `*_bonus.c/.h` como archivos separados de la parte obligatoria.
+Antes de dar nada por terminado, prueba al menos estos escenarios (con `cd coders && make re` primero):
 
-Verifica que `make`, `make clean`, `make fclean`, `make re` funcionan **desde dentro de `coders/`**.
-
----
-
-## 11. Fase 10 — Norma (checklist de auto-verificación)
-
-Antes de entregar, pasa el checker de Norma de tu campus sobre **todos** los `.c`/`.h` de `coders/` (incluido `heap.c`) y confirma cero errores. Puntos donde este diseño suele generar problemas si no divides bien las funciones:
-- las operaciones del heap (inserción/extracción con reordenamiento) tienden a superar el límite de líneas si no separas el reordenamiento en su propia función,
-- `dongle_acquire` tiene varias condiciones que comprobar — considera extraer esa comprobación a una función aparte que devuelva `int`,
-- revisa el número de variables declaradas por función (los structs grandes tientan a declarar muchas locales de golpe).
+- **Caso trivial `N=1`**: debería agotarse, documenta en el README por qué es el comportamiento esperado.
+- **Caso pequeño viable en `fifo`**: comprobar que todos llegan a `number_of_compiles_required` sin que nadie se queme.
+- **El mismo caso en `edf`**: comparar comportamiento contra `fifo`, no debería quemarse nadie si los parámetros son viables.
+- **Caso no viable** (burnout muy ajustado frente al resto de tiempos): comprobar que aparece `"burned out"` en el log, y que el timestamp de ese evento está dentro del margen de 10 ms respecto al momento real en que debería haberse detectado.
+- **Contención real**: `number_of_coders` alto (10-20) con tiempos muy cortos, para forzar que varios coders compitan de verdad por los mismos dongles.
+- **Memoria**: `valgrind --leak-check=full --show-reachable=yes` sobre el caso viable — cero leaks, cero errores.
+- **Concurrencia**: una build aparte con `-fsanitize=thread` (no se entrega, es solo para depurar) sobre el caso de contención alta — cero data races reportadas. `helgrind` es una alternativa si prefieres Valgrind también para esto.
 
 ---
 
-## 12. Fase 11 — Plan de pruebas (comandos concretos)
+## 7. Fase 11 — Norma
 
-```bash
-cd coders && make re
-
-# Caso trivial N=1 (debe agotarse, documenta por qué en el README)
-./codexion 1 2000 200 200 200 3 100 fifo
-
-# Caso viable pequeño, FIFO
-./codexion 5 800 200 200 200 5 50 fifo
-
-# Mismo caso, EDF (no debería agotarse nadie si los parámetros son viables)
-./codexion 5 800 200 200 200 5 50 edf
-
-# Caso no viable (burnout muy ajustado) -> comprobar log "burned out" y timestamp
-./codexion 5 250 200 200 200 5 50 fifo
-
-# Memoria y race conditions
-valgrind --leak-check=full --show-reachable=yes ./codexion 5 800 200 200 200 5 50 fifo
-```
-- Para el caso EDF "viable", verifica que ningún coder recibe `"burned out"`.
-- Para el caso "no viable", comprueba que el log de `"burned out"` aparece dentro de los 10 ms del momento real en que debería haberse detectado.
-- Prueba también con `number_of_coders` alto (10-20) y tiempos muy cortos para forzar contención real sobre los dongles.
-- Build de test con TSan (no se entrega, solo para depurar):
-```bash
-cc -Wall -Wextra -pthread -fsanitize=thread *.c -o codexion_tsan
-./codexion_tsan 5 800 200 200 200 5 50 edf
-```
+Antes de entregar, pasa el checker de Norma de tu campus sobre todos los `.c`/`.h` de `coders/` y confirma cero errores. Con el código ya escrito hasta ahora no debería haber sorpresas (se ha ido comprobando línea/parámetros/variables al escribirlo), pero presta atención especial en el código que aún falta a:
+- Funciones del monitor y de `coder_routine`, que tienden a acumular muchas comprobaciones seguidas — extrae condiciones complejas a funciones auxiliares que devuelvan `int`, como ya se hizo en `dongle.c` con `can_take_now`.
+- El número de variables declaradas por función en `main.c`/`thread_creator.c`, donde la tentación de declarar muchos punteros locales de golpe es alta.
 
 ---
 
-## 13. Fase 12 — README.md (raíz del repo, estructura exigida)
+## 8. Fase 12 — README.md (raíz del repo)
 
-Secciones obligatorias, en este orden:
-1. Primera línea en cursiva: `*Este proyecto ha sido creado como parte del currículo de 42 por saperez-*`.
-2. **Descripción**.
-3. **Instrucciones** (compilación: `cd coders && make`; ejecución con ejemplo de comando).
-4. **Recursos** (documentación consultada + descripción honesta de en qué partes usaste IA y para qué).
-5. **Blocking cases handled** (cómo evitas deadlock, starvation, cómo gestionas el cooldown, cómo detectas el agotamiento con precisión, cómo serializas el log).
-6. **Thread synchronization mechanisms** (qué mutex/condvar usas y para qué, cómo evitas race conditions, cómo se comunican coders y monitor de forma thread-safe).
+No existe todavía. Tiene que estar en la **raíz** del repo (no dentro de `coders/`), con estas secciones en este orden:
+
+1. Primera línea en cursiva: la atribución exigida por el subject sobre el currículo de 42.
+2. **Descripción** del proyecto.
+3. **Instrucciones**: cómo compilar (`cd coders && make`) y cómo ejecutar, con un ejemplo de comando real.
+4. **Recursos**: qué documentación has consultado, y una descripción honesta de en qué partes has usado asistencia de IA y para qué (esta misma sesión de trabajo con Claude Code entra aquí — sé específico sobre qué se generó con ayuda y qué no).
+5. **Blocking cases handled**: cómo evitas deadlock (el criterio de orden por `id` ya implementado en `dongle.c`), starvation, cómo gestionas el cooldown, cómo detectas el agotamiento con precisión, cómo serializas el log.
+6. **Thread synchronization mechanisms**: qué mutex/condvar usas y para qué (puedes basarte literalmente en la tabla de la sección 0 de este documento), cómo evitas race conditions, cómo se comunican coders y monitor de forma thread-safe.
 
 ---
 
-## 14. Fase 13 — Entrega final (checklist literal)
+## 9. Fase 13 — Entrega final (checklist)
 
-- [ ] `coders/` contiene exactamente: `Makefile`, `*.c`, `*.h` (+ `*_bonus.{c,h}` si hay bonus, en archivos separados de la obligatoria).
-- [ ] `README.md` está en la **raíz** del repo (no dentro de `coders/`).
+- [ ] `coders/` contiene exactamente `Makefile`, `*.c`, `*.h` (más `*_bonus.{c,h}` si hay bonus, en archivos separados de la parte obligatoria).
+- [ ] `README.md` en la raíz, no dentro de `coders/`.
 - [ ] `cd coders && make re` compila limpio, sin warnings, con `-Wall -Wextra -Werror -pthread`.
 - [ ] Norma sin errores en todos los archivos.
+- [ ] `valgrind` sin leaks, TSan/helgrind sin data races.
 - [ ] `git status` limpio, todo commiteado y pusheado a `origin/main`.
-- [ ] Repasa el capítulo "Recode instructions" del subject: en la defensa te pueden pedir modificar algo en vivo — asegúrate de poder explicar y tocar cualquier parte de tu propio código sin depender de este plan.
+- [ ] Repasa el capítulo "Recode instructions" del subject: en la defensa te pueden pedir modificar algo en vivo — asegúrate de poder explicar y tocar cualquier parte del código (incluido lo que se ha escrito con ayuda en esta sesión) sin depender de este documento.
 
 ---
 
-## 15. Orden de implementación recomendado (con dependencias)
+## 10. Orden recomendado a partir de aquí
 
-1. Arreglar `thread_creator.c` (ahora mismo no compila) — aunque sea con un stub válido, para no bloquear `make`.
-2. `codexion.h`: añadir `t_dongle`, `t_heap`, `t_sim`, corregir `t_coder` (§2).
-3. `heap.c` aislado y probado con un `main` temporal (§3).
-4. `validate_number.c` + integrarlo en `check_args.c` (§9) — independiente del resto, buena victoria rápida.
-5. `dongle.c`: `dongle_acquire`, `dongle_release`, `dongle_acquire_pair` (§4.1).
-6. `log.c`: `now_ms`, `log_event` (§6) — lo necesitas antes de probar nada con salida legible.
-7. `coder_routine.c` (§4.2).
-8. `monitor.c` (§5).
-9. `main.c` + `thread_creator.c` reales: creación del struct raíz, `pthread_create` de N coders + monitor, `pthread_join` de todos, limpieza final (§1, §8).
-10. Pruebas con los comandos de §12 (empieza con FIFO simple antes de EDF).
-11. Norma (§11).
-12. `README.md` (§13).
-13. Entrega (§14).
+1. `log.c` (fase 1 de este documento) — desbloquea el enlazado del binario.
+2. `coder_routine.c` (fase 2).
+3. `monitor.c` (fase 3).
+4. `main.c` + `thread_creator.c` reales (fase 4).
+5. Primeras pruebas manuales con los comandos de la fase 6, empezando por `fifo` antes que `edf`.
+6. `Makefile` (fase 5) si no lo has ido necesitando ya para las pruebas anteriores (probablemente sí, muévelo antes si te hace falta compilar según trabajas).
+7. Pruebas completas (fase 6), incluidas valgrind y TSan.
+8. Norma (fase 7).
+9. README.md (fase 8).
+10. Entrega (fase 9).
