@@ -14,19 +14,8 @@
 
 //Ciclo de vida del dongle y utilidades basicas. La logica de
 //adquisicion (dongle_acquire/dongle_acquire_pair) vive en
-//dongle_acquire.c, por limite de funciones por archivo de la Norma.
-
-//Reloj propio para el cooldown del dongle, independiente del
-//start_time_ms de la simulacion (ese es solo para los timestamps
-//del log). gettimeofday es la unica funcion de tiempo autorizada.
-//No static: tambien la usa dongle_acquire.c.
-long	get_now_ms(void)
-{
-	struct timeval	tv;
-
-	gettimeofday(&tv, NULL);
-	return ((long)tv.tv_sec * 1000 + (long)tv.tv_usec / 1000);
-}
+//dongle_acquire.c, y el reloj (get_now_ms) en time_utils.c, por
+//limite de funciones por archivo de la Norma.
 
 //Lectura protegida del flag de parada: la escribe el monitor, la
 //leen los coders (incluido dentro de dongle_acquire) desde otro

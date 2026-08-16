@@ -74,11 +74,16 @@ typedef struct s_dongle
 
 //Struct para los coders. "left"/"right" son los dongles que le tocan
 //segun su posicion en la mesa circular (si number_of_coders == 1,
-//left y right apuntan al mismo dongle).
+//left y right apuntan al mismo dongle). "thread_launched" hace
+//falta porque pthread_create no toca "thread" si falla: sin este
+//flag, join_threads no tendria forma de saber si es seguro hacer
+//pthread_join sobre el (join sobre un pthread_t nunca creado es
+//comportamiento indefinido: cuelgue o crash segun la plataforma).
 typedef struct s_coder
 {
 	int				id;
 	pthread_t		thread;
+	int				thread_launched;
 	t_dongle		*left;
 	t_dongle		*right;
 	long			last_compile_start_ms;
@@ -95,6 +100,7 @@ struct s_sim
 	t_dongle		**dongles;
 	t_coder			**coders;
 	pthread_t		thread;
+	int				monitor_launched;
 	pthread_mutex_t	mutex_log;
 	int				stop_flag;
 	pthread_mutex_t	mutex_stop_flag;
@@ -121,8 +127,11 @@ void		heap_swap(t_heap_node *a, t_heap_node *b);
 void		heap_sift_up(t_heap *heap, int i);
 void		heap_sift_down(t_heap *heap, int i);
 
-//dongle.c
+//time_utils.c
 long		get_now_ms(void);
+void		deadline_in_ms(int ms, struct timespec *out);
+
+//dongle.c
 int			sim_is_stopped(t_sim *sim);
 t_dongle	*dongle_create(int id, int capacity);
 void		dongle_destroy(t_dongle *dongle);
@@ -133,7 +142,27 @@ void		dongle_release(t_dongle *dongle, t_coder *coder);
 int			dongle_acquire(t_dongle *dongle, t_coder *coder);
 int			dongle_acquire_pair(t_coder *coder);
 
-//log.c (pendiente: punto 5 de la guia, dongle.c ya depende de ella)
+//log.c
+long		now_ms(t_sim *sim);
 void		log_event(t_sim *sim, int coder_id, const char *event);
+
+//coder_routine.c
+void		*coder_routine(void *arg);
+
+//monitor.c
+void		*monitor_routine(void *arg);
+
+//sim_builders.c (crea los arrays de dongles/coders, y sabe deshacer
+//su propio trabajo si un malloc a mitad falla; separado de
+//thread_creator.c por limite de funciones por archivo de la Norma)
+t_dongle	**create_dongles(int n);
+void		free_dongles(t_dongle **dongles, int count);
+t_coder		**create_coders(t_sim *sim);
+void		free_coders(t_coder **coders, int count);
+
+//thread_creator.c
+t_sim		*build_sim(t_args *args);
+int			launch_threads(t_sim *sim);
+void		join_threads(t_sim *sim);
 
 #endif

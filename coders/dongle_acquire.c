@@ -40,12 +40,30 @@ static int	can_take_now(t_dongle *dongle, t_coder *coder, long now)
 	return (1);
 }
 
-//Decide el orden de adquisicion por id de dongle (el mas pequeno
-//primero), igual para todos los coders: rompe la simetria clasica
-//del problema de los filosofos y evita el deadlock circular.
+//Solucion "asimetrica" clasica del problema de los filosofos:
+//coders de id par piden primero su dongle izquierdo, los de id
+//impar piden primero el derecho. Esto evita el deadlock circular
+//igual que "siempre el id de dongle mas bajo primero", pero reparte
+//mejor la contencion: con esa otra regla, casi todos acaban pidiendo
+//primero su propio dongle izquierdo (porque coincide con ser el id
+//mas bajo) y solo compiten de verdad por el segundo, dejando que
+//solo 1 de cada ronda consiga el par completo en vez de los ~N/2
+//que caben en la mesa. Con paridad, cada dongle de indice par pasa
+//a ser una contienda real entre dos coders, lo que permite que se
+//formen varias parejas a la vez con mas frecuencia.
+//Por que sigue sin haber deadlock: para que los N coders se
+//bloqueasen en circulo, los N tendrian que sostener cada uno
+//exactamente su primer dongle a la vez sin que nadie mas lo
+//reclamara. Con esta regla, todo dongle de indice par SIEMPRE tiene
+//dos coders queriendolo como primera opcion (su dueño par, que lo
+//pide como izquierdo, y su vecino impar, que lo pide como derecho),
+//asi que nunca pueden los dos sostenerlo en el mismo instante: al
+//menos uno de ellos se queda sin conseguir siquiera su primer
+//dongle, así que la mesa nunca puede terminar con los N dongles
+//repartidos uno-a-uno y todos esperando el segundo.
 static void	order_dongles(t_coder *coder, t_dongle **first, t_dongle **second)
 {
-	if (coder->left->id < coder->right->id)
+	if (coder->id % 2 == 0)
 	{
 		*first = coder->left;
 		*second = coder->right;
@@ -58,21 +76,28 @@ static void	order_dongles(t_coder *coder, t_dongle **first, t_dongle **second)
 }
 
 //Se registra en el heap de espera del dongle y duerme en la condvar
-//hasta que le toque (can_take_now) o la simulacion se pare. Ojo:
-//el while, no if, es obligatorio por los wakeups espurios y porque
-//solo hay broadcast (no signal) disponible: se despierta a todos
-//los que esperan ese dongle y cada uno tiene que revalidar si le
-//toca de verdad a el.
+//hasta que le toque (can_take_now) o la simulacion se pare. Usa
+//timedwait (no un cond_wait indefinido) porque el fin del cooldown
+//no dispara ningun broadcast por si mismo: sin el limite de tiempo,
+//un coder que se despierta y ve que el cooldown no ha pasado podria
+//quedarse dormido para siempre. El while (no if) revalida siempre
+//la condicion completa, tanto por el timeout como por los wakeups
+//espurios y porque solo hay broadcast (no signal): se despierta a
+//todos los que esperan ese dongle y cada uno comprueba si le toca.
 int	dongle_acquire(t_dongle *dongle, t_coder *coder)
 {
-	long	key;
+	long			key;
+	struct timespec	deadline;
 
 	pthread_mutex_lock(&dongle->mutex);
 	key = compute_key(dongle, coder);
 	heap_push(dongle->waiting, key, coder->id);
 	while (!can_take_now(dongle, coder, get_now_ms())
 		&& !sim_is_stopped(coder->simulation))
-		pthread_cond_wait(&dongle->cond, &dongle->mutex);
+	{
+		deadline_in_ms(5, &deadline);
+		pthread_cond_timedwait(&dongle->cond, &dongle->mutex, &deadline);
+	}
 	if (sim_is_stopped(coder->simulation))
 	{
 		pthread_mutex_unlock(&dongle->mutex);
