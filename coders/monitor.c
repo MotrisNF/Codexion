@@ -12,26 +12,6 @@
 
 #include "codexion.h"
 
-static int	coder_burned_out(t_coder *coder, int burnout, long now)
-{
-	int	timed_out;
-
-	pthread_mutex_lock(&coder->mutex);
-	timed_out = ((now - coder->last_compile_start_ms) >= burnout);
-	pthread_mutex_unlock(&coder->mutex);
-	return (timed_out);
-}
-
-static int	coder_finished(t_coder *coder, int required)
-{
-	int	done;
-
-	pthread_mutex_lock(&coder->mutex);
-	done = (coder->compilations_done >= required);
-	pthread_mutex_unlock(&coder->mutex);
-	return (done);
-}
-
 static void	stop_simulation(t_sim *sim)
 {
 	int	i;
@@ -68,29 +48,6 @@ static int	check_coders(t_sim *sim, long now)
 		i++;
 	}
 	return (all_done);
-}
-
-static long	next_burnout_deadline(t_sim *sim, long now)
-{
-	int		i;
-	long	deadline;
-	long	best;
-
-	i = 0;
-	best = now;
-	while (i < sim->args->number_of_coders)
-	{
-		pthread_mutex_lock(&sim->coders[i]->mutex);
-		deadline = sim->coders[i]->last_compile_start_ms
-			+ sim->args->time_to_burnout;
-		pthread_mutex_unlock(&sim->coders[i]->mutex);
-		if (i == 0 || deadline < best)
-			best = deadline;
-		i++;
-	}
-	if (best < now)
-		best = now;
-	return (best);
 }
 
 void	*monitor_routine(void *arg)

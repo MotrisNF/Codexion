@@ -55,6 +55,6 @@ void	log_event(t_sim *sim, int coder_id, const char *event)
 			coder_id, event);
 		pthread_mutex_unlock(&sim->mutex_log);
 	}
-	if (!strncmp(event, "burned out", 11))
+	if (strcmp(event, "burned out") == 0)
 		sim->can_write = 0;
 }

@@ -61,4 +61,7 @@ void	dongle_release(t_dongle *dongle, t_coder *coder)
 	dongle->aviable_at_ms = get_now_ms() + args->dongle_cooldown;
 	pthread_mutex_unlock(&dongle->mutex);
 	pthread_cond_broadcast(&dongle->cond);
+	pthread_mutex_lock(&coder->simulation->mutex_progress);
+	pthread_cond_broadcast(&coder->simulation->cond_progress);
+	pthread_mutex_unlock(&coder->simulation->mutex_progress);
 }

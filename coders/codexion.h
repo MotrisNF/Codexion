@@ -109,6 +109,10 @@ int			heap_push(t_heap *heap, long key, int coder_id);
 int			heap_pop_min(t_heap *heap);
 int			heap_is_empty(t_heap *heap);
 
+//heap_lookup.c
+int			heap_find(t_heap *heap, int coder_id, long *key_out);
+int			heap_remove_id(t_heap *heap, int coder_id);
+
 //heap_utils.c 
 void		heap_swap(t_heap_node *a, t_heap_node *b);
 void		heap_sift_up(t_heap *heap, int i);
@@ -125,7 +129,26 @@ void		dongle_destroy(t_dongle *dongle);
 void		dongle_release(t_dongle *dongle, t_coder *coder);
 
 //dongle_acquire.c
+long		compute_key(t_dongle *dongle, t_coder *coder);
+long		dongle_wait_hint(t_dongle *dongle, long now);
 int			dongle_acquire_pair(t_coder *coder);
+
+//dongle_acquire_fifo.c
+int			dongle_acquire_pair_fifo(t_coder *coder);
+
+//dongle_topology.c
+t_coder		*other_side(t_sim *sim, t_dongle *dongle, t_coder *coder);
+t_dongle	*partner_dongle(t_coder *coder, t_dongle *shared);
+void		order_dongles(t_coder *coder, t_dongle **lo, t_dongle **hi);
+
+//dongle_lock_set.c
+int			build_lock_set(t_sim *sim, t_coder *coder, t_dongle **pair,
+				t_dongle **set);
+void		sort_by_id(t_dongle **set, int count);
+void		lock_set(t_dongle **set, int count, int lock);
+
+//dongle_acquire_edf.c
+int			dongle_acquire_pair_edf(t_coder *coder);
 
 //log.c
 long		now_ms(t_sim *sim);
@@ -136,6 +159,11 @@ void		*coder_routine(void *arg);
 
 //monitor.c
 void		*monitor_routine(void *arg);
+
+//monitor_utils.c
+int			coder_burned_out(t_coder *coder, int burnout, long now);
+int			coder_finished(t_coder *coder, int required);
+long		next_burnout_deadline(t_sim *sim, long now);
 
 //sim_builders.c 
 t_dongle	**create_dongles(int n);
