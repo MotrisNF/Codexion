@@ -6,7 +6,7 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/13 13:14:47 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/17 09:14:13 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/17 11:28:43 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -90,6 +90,7 @@ struct s_sim
 	int				stop_flag;
 	pthread_mutex_t	mutex_stop_flag;
 	long			start_time_ms;
+	int				can_write;
 };
 
 //check_args.c

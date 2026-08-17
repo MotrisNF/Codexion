@@ -6,7 +6,7 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/13 15:21:26 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/17 09:19:51 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/17 11:29:26 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,6 +41,7 @@ t_sim	*build_sim(t_args *args)
 		free_dongles(sim->dongles, args->number_of_coders);
 		return (destroy_sim_mutexes(sim), NULL);
 	}
+	sim->can_write = 1;
 	return (sim);
 }
 

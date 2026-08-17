@@ -6,7 +6,7 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/16 00:00:00 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/17 10:13:44 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/17 11:36:02 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -48,8 +48,13 @@ static const char	*color_for(int coder_id)
 
 void	log_event(t_sim *sim, int coder_id, const char *event)
 {
-	pthread_mutex_lock(&sim->mutex_log);
-	printf("%s%ld %d %s\033[0m\n", color_for(coder_id), now_ms(sim),
-		coder_id, event);
-	pthread_mutex_unlock(&sim->mutex_log);
+	if (sim->can_write == 1)
+	{
+		pthread_mutex_lock(&sim->mutex_log);
+		printf("%s%ld %d %s\033[0m\n", color_for(coder_id), now_ms(sim),
+			coder_id, event);
+		pthread_mutex_unlock(&sim->mutex_log);
+	}
+	if (!strncmp(event, "burned out", 11))
+		sim->can_write = 0;
 }
