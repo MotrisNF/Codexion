@@ -6,15 +6,12 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/13 13:12:17 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/16 00:00:00 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/17 09:18:33 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
 
-//Libera todo en orden inverso a como se creo en build_sim/
-//create_dongles/create_coders (thread_creator.c). Se llama solo
-//despues de que join_threads haya terminado con todos los hilos.
 static void	destroy_sim(t_sim *sim)
 {
 	int	i;

@@ -6,7 +6,7 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/16 00:00:00 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/16 00:00:00 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/17 09:20:44 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,10 +17,6 @@ static int	is_digit_char(char c)
 	return (c >= '0' && c <= '9');
 }
 
-//Acumula un digito mas en *value y comprueba overflow de int en el
-//mismo paso (asi el valor nunca crece mas de lo que hace falta para
-//detectarlo). "value" es long: en esta maquina (x86_64) es de 64
-//bits, mas que de sobra para no desbordar antes de la comprobacion.
 static int	accumulate_digit(long *value, char digit, int sign)
 {
 	*value = *value * 10 + (digit - '0');
@@ -31,9 +27,6 @@ static int	accumulate_digit(long *value, char digit, int sign)
 	return (1);
 }
 
-//1 si str es un entero valido para atoi (con signo opcional, solo
-//digitos, sin overflow de int), 0 en cualquier otro caso: vacio,
-//caracteres no numericos, espacios, "+"/"-" solos, etc.
 int	is_valid_number(const char *str)
 {
 	int		i;

@@ -6,15 +6,12 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/13 13:26:38 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/13 15:37:05 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/17 09:14:24 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
 
-//Recorre argv[1]..argv[7] (los 7 numericos, el schedule en argv[8]
-//no pasa por aqui) y comprueba cada uno con is_valid_number antes de
-//que fill_struct llame a atoi.
 static int	check_numeric_args(char **argv)
 {
 	int	i;

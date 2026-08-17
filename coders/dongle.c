@@ -6,20 +6,12 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/16 00:00:00 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/16 00:00:00 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/17 09:17:07 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
 
-//Ciclo de vida del dongle y utilidades basicas. La logica de
-//adquisicion (dongle_acquire/dongle_acquire_pair) vive en
-//dongle_acquire.c, y el reloj (get_now_ms) en time_utils.c, por
-//limite de funciones por archivo de la Norma.
-
-//Lectura protegida del flag de parada: la escribe el monitor, la
-//leen los coders (incluido dentro de dongle_acquire) desde otro
-//hilo, asi que siempre pasa por mutex_stop_flag.
 int	sim_is_stopped(t_sim *sim)
 {
 	int	stopped;
@@ -59,11 +51,6 @@ void	dongle_destroy(t_dongle *dongle)
 	free(dongle);
 }
 
-//Libera el dongle, fija el cooldown y despierta (broadcast, no hay
-//signal) a todo el que estuviera esperando en su condvar. El
-//broadcast va fuera del lock: el estado ya quedo actualizado antes
-//de soltar el mutex, y asi no se despierta a nadie contra un mutex
-//que seguimos reteniendo nosotros mismos.
 void	dongle_release(t_dongle *dongle, t_coder *coder)
 {
 	t_args	*args;

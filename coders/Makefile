@@ -1,7 +1,7 @@
 NAME	= codexion
 
 CC		= cc
-CFLAGS	= -Wall -Wextra -Werror -pthread -g
+CFLAGS	= -Wall -Wextra -Werror -pthread
 
 SRCS	=	check_args.c \
 			validate_number.c \
