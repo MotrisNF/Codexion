@@ -14,17 +14,19 @@
 
 static void	sleep_chunked(t_sim *sim, int ms)
 {
-	int	elapsed;
-	int	step;
+	long	target;
+	long	remaining;
+	long	step;
 
-	elapsed = 0;
-	while (elapsed < ms && !sim_is_stopped(sim))
+	target = get_now_ms() + ms;
+	remaining = target - get_now_ms();
+	while (remaining > 0 && !sim_is_stopped(sim))
 	{
-		step = ms - elapsed;
+		step = remaining;
 		if (step > 10)
 			step = 10;
 		usleep(step * 1000);
-		elapsed += step;
+		remaining = target - get_now_ms();
 	}
 }
 
@@ -56,6 +58,9 @@ static int	do_compile(t_coder *coder)
 	pthread_mutex_lock(&coder->mutex);
 	coder->compilations_done++;
 	pthread_mutex_unlock(&coder->mutex);
+	pthread_mutex_lock(&coder->simulation->mutex_progress);
+	pthread_cond_broadcast(&coder->simulation->cond_progress);
+	pthread_mutex_unlock(&coder->simulation->mutex_progress);
 	return (1);
 }
 

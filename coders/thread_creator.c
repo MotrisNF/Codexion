@@ -16,6 +16,8 @@ static void	destroy_sim_mutexes(t_sim *sim)
 {
 	pthread_mutex_destroy(&sim->mutex_log);
 	pthread_mutex_destroy(&sim->mutex_stop_flag);
+	pthread_mutex_destroy(&sim->mutex_progress);
+	pthread_cond_destroy(&sim->cond_progress);
 	free(sim);
 }
 
@@ -32,6 +34,8 @@ t_sim	*build_sim(t_args *args)
 	sim->start_time_ms = get_now_ms();
 	pthread_mutex_init(&sim->mutex_log, NULL);
 	pthread_mutex_init(&sim->mutex_stop_flag, NULL);
+	pthread_mutex_init(&sim->mutex_progress, NULL);
+	pthread_cond_init(&sim->cond_progress, NULL);
 	sim->dongles = create_dongles(args->number_of_coders);
 	if (!sim->dongles)
 		return (destroy_sim_mutexes(sim), NULL);

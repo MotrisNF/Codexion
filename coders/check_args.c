@@ -48,18 +48,18 @@ int	check_struct_values(t_args *args)
 	value = 0;
 	if (args->number_of_coders <= 0)
 		value = printf("number_of_coders is <= 0 (argv[1]).\n");
-	if (args->time_to_burnout <= 0)
-		value = printf("time_to_burnout is <= 0 (argv[2]).\n");
-	if (args->time_to_compile <= 0)
-		value = printf("time_to_compile is <= 0 (argv[3]).\n");
-	if (args->time_to_debug <= 0)
-		value = printf("time_to_debug is <= 0 (argv[4]).\n");
-	if (args->time_to_refactor <= 0)
-		value = printf("time_to_refactor is <= 0 (argv[5]).\n");
+	if (args->time_to_burnout < 0)
+		value = printf("time_to_burnout is < 0 (argv[2]).\n");
+	if (args->time_to_compile < 0)
+		value = printf("time_to_compile is < 0 (argv[3]).\n");
+	if (args->time_to_debug < 0)
+		value = printf("time_to_debug is < 0 (argv[4]).\n");
+	if (args->time_to_refactor < 0)
+		value = printf("time_to_refactor is < 0 (argv[5]).\n");
 	if (args->number_of_compiles_required <= 0)
 		value = printf("number_of_compiles_required is <= 0 (argv[6]).\n");
-	if (args->dongle_cooldown <= 0)
-		value = printf("dongle_cooldown is <= 0 (argv[7]).\n");
+	if (args->dongle_cooldown < 0)
+		value = printf("dongle_cooldown is < 0 (argv[7]).\n");
 	if (strcmp("fifo", args->schedule) != 0
 		&& strcmp("edf", args->schedule) != 0)
 	{

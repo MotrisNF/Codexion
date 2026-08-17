@@ -89,6 +89,8 @@ struct s_sim
 	pthread_mutex_t	mutex_log;
 	int				stop_flag;
 	pthread_mutex_t	mutex_stop_flag;
+	pthread_mutex_t	mutex_progress;
+	pthread_cond_t	cond_progress;
 	long			start_time_ms;
 	int				can_write;
 };
@@ -122,8 +124,7 @@ t_dongle	*dongle_create(int id, int capacity);
 void		dongle_destroy(t_dongle *dongle);
 void		dongle_release(t_dongle *dongle, t_coder *coder);
 
-//dongle_acquire.c 
-int			dongle_acquire(t_dongle *dongle, t_coder *coder);
+//dongle_acquire.c
 int			dongle_acquire_pair(t_coder *coder);
 
 //log.c

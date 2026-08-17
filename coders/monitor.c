@@ -70,9 +70,34 @@ static int	check_coders(t_sim *sim, long now)
 	return (all_done);
 }
 
+static long	next_burnout_deadline(t_sim *sim, long now)
+{
+	int		i;
+	long	deadline;
+	long	best;
+
+	i = 0;
+	best = now;
+	while (i < sim->args->number_of_coders)
+	{
+		pthread_mutex_lock(&sim->coders[i]->mutex);
+		deadline = sim->coders[i]->last_compile_start_ms
+			+ sim->args->time_to_burnout;
+		pthread_mutex_unlock(&sim->coders[i]->mutex);
+		if (i == 0 || deadline < best)
+			best = deadline;
+		i++;
+	}
+	if (best < now)
+		best = now;
+	return (best);
+}
+
 void	*monitor_routine(void *arg)
 {
-	t_sim	*sim;
+	t_sim			*sim;
+	struct timespec	deadline;
+	long			now;
 
 	sim = (t_sim *)arg;
 	while (!sim_is_stopped(sim))
@@ -82,7 +107,12 @@ void	*monitor_routine(void *arg)
 			stop_simulation(sim);
 			break ;
 		}
-		usleep(1000);
+		now = get_now_ms();
+		deadline_in_ms(next_burnout_deadline(sim, now) - now, &deadline);
+		pthread_mutex_lock(&sim->mutex_progress);
+		pthread_cond_timedwait(&sim->cond_progress, &sim->mutex_progress,
+			&deadline);
+		pthread_mutex_unlock(&sim->mutex_progress);
 	}
 	return (NULL);
 }

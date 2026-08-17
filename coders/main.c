@@ -30,6 +30,8 @@ static void	destroy_sim(t_sim *sim)
 	free(sim->dongles);
 	pthread_mutex_destroy(&sim->mutex_log);
 	pthread_mutex_destroy(&sim->mutex_stop_flag);
+	pthread_mutex_destroy(&sim->mutex_progress);
+	pthread_cond_destroy(&sim->cond_progress);
 	free(sim);
 }
 
