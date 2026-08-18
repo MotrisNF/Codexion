@@ -159,10 +159,12 @@ void		*coder_routine(void *arg);
 
 //monitor.c
 void		*monitor_routine(void *arg);
+void		stop_simulation(t_sim *sim);
 
 //monitor_utils.c
 int			coder_burned_out(t_coder *coder, int burnout, long now);
 int			coder_finished(t_coder *coder, int required);
+int			coders_all_finished(t_sim *sim);
 long		next_burnout_deadline(t_sim *sim, long now);
 
 //sim_builders.c 

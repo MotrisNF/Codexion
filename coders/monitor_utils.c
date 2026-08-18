@@ -32,6 +32,21 @@ int	coder_finished(t_coder *coder, int required)
 	return (done);
 }
 
+int	coders_all_finished(t_sim *sim)
+{
+	int	i;
+
+	i = 0;
+	while (i < sim->args->number_of_coders)
+	{
+		if (!coder_finished(sim->coders[i],
+				sim->args->number_of_compiles_required))
+			return (0);
+		i++;
+	}
+	return (1);
+}
+
 long	next_burnout_deadline(t_sim *sim, long now)
 {
 	int		i;

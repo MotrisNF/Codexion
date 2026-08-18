@@ -61,6 +61,8 @@ static int	do_compile(t_coder *coder)
 	pthread_mutex_lock(&coder->simulation->mutex_progress);
 	pthread_cond_broadcast(&coder->simulation->cond_progress);
 	pthread_mutex_unlock(&coder->simulation->mutex_progress);
+	if (coders_all_finished(coder->simulation))
+		stop_simulation(coder->simulation);
 	return (1);
 }
 

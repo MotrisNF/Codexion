@@ -12,7 +12,7 @@
 
 #include "codexion.h"
 
-static void	stop_simulation(t_sim *sim)
+void	stop_simulation(t_sim *sim)
 {
 	int	i;
 
