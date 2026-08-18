@@ -48,13 +48,13 @@ static const char	*color_for(int coder_id)
 
 void	log_event(t_sim *sim, int coder_id, const char *event)
 {
+	pthread_mutex_lock(&sim->mutex_log);
 	if (sim->can_write == 1)
 	{
-		pthread_mutex_lock(&sim->mutex_log);
 		printf("%s%ld %d %s\033[0m\n", color_for(coder_id), now_ms(sim),
 			coder_id, event);
-		pthread_mutex_unlock(&sim->mutex_log);
+		if (strcmp(event, "burned out") == 0)
+			sim->can_write = 0;
 	}
-	if (strcmp(event, "burned out") == 0)
-		sim->can_write = 0;
+	pthread_mutex_unlock(&sim->mutex_log);
 }

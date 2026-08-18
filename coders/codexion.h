@@ -6,7 +6,7 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/13 13:14:47 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/17 11:28:43 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/18 11:06:35 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,7 +37,7 @@ typedef struct s_args
 	char			*schedule;
 }	t_args;
 
-//Un node to the heap
+//A node to the heap
 typedef struct s_heap_node
 {
 	long			key;
@@ -97,7 +97,7 @@ struct s_sim
 
 //check_args.c
 t_args		*cheack_args(char **argv, int argc);
-int			check_struct_values(t_args *args);
+int			check_struct_values(char **arg, t_args *args);
 
 //validate_number.c
 int			is_valid_number(const char *str);

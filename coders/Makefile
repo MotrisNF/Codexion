@@ -41,4 +41,20 @@ fclean: clean
 
 re: fclean all
 
-.PHONY: all clean fclean re
+.SILENT: try
+
+EXECUTABLE	= $(shell [ -f ./$(NAME) ] && echo "ok")
+
+try:
+ifeq ($(EXECUTABLE),)
+	@echo "Error! Run make or make all before doing a test."
+else
+	@echo "Testing with values 3 300 50 25 10 15 15 edf"
+	@sleep 2
+	@./$(NAME) 3 300 50 25 10 15 15 edf
+	@echo "\nTesting with values 3 300 50 25 10 15 15 fifo"
+	@sleep 2
+	@./$(NAME) 3 300 50 25 10 15 15 fifo
+endif
+
+.PHONY: all clean fclean re try

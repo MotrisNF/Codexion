@@ -6,11 +6,21 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/13 13:12:17 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/17 09:18:33 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/18 09:51:02 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
+
+static int	print_format_error(void)
+{
+	printf("Use the correct format.\nnumber_of_coders > 0\n");
+	printf("time_to_burnout > 0\ntime_to compile > 0\n");
+	printf("time_to_debug > 0\ntime_to_refactor > 0\n");
+	printf("number_of_compiles_required <= 0\n");
+	printf("dongle_cooldown >= 0\nschedule: only 'fifo' or 'edf'\n");
+	return (1);
+}
 
 static void	destroy_sim(t_sim *sim)
 {
@@ -43,7 +53,7 @@ int	main(int argc, char **argv)
 
 	args = cheack_args(argv, argc);
 	if (!args)
-		return (printf("Use the correct format.\n"), 1);
+		return (print_format_error());
 	sim = build_sim(args);
 	if (!sim)
 		return (free(args), printf("Allocation failed.\n"), 1);
