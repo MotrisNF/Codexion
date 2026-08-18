@@ -6,18 +6,12 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/16 00:00:00 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/17 09:16:41 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/18 09:17:46 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
 
-/*
-** All coders start with the same millisecond-rounded last_compile_start_ms
-** (set at creation time), so their very first EDF deadlines are usually
-** an exact tie. Breaking ties by coder id keeps arbitration deterministic
-** instead of depending on internal heap layout.
-*/
 long	compute_key(t_dongle *dongle, t_coder *coder)
 {
 	if (strcmp(coder->simulation->args->schedule, "edf") == 0)

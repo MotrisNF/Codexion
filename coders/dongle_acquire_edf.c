@@ -6,18 +6,12 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/17 00:00:00 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/17 00:00:00 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/18 09:17:21 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
 
-/*
-** EDF: the subject requires that nobody burns out under EDF while the
-** parameters stay viable. Both dongles of a pair are grabbed together:
-** either both are genuinely free right now or neither is taken, so
-** nobody holds a dongle hostage while stuck on the other one.
-*/
 static void	dongle_enqueue(t_dongle *dongle, t_coder *coder)
 {
 	long	key;
@@ -28,13 +22,6 @@ static void	dongle_enqueue(t_dongle *dongle, t_coder *coder)
 	pthread_mutex_unlock(&dongle->mutex);
 }
 
-/*
-** `dongle` is ready for `coder` if it's physically free AND no rival
-** with strictly better priority is both waiting for it and genuinely
-** able to use it right now. A rival that merely arrived first but is
-** still stuck on its own other dongle does not get to sit on this one
-** unused - that was wasting real throughput.
-*/
 static int	edf_dongle_ready(t_sim *sim, t_dongle *dongle, t_coder *coder,
 	long now)
 {
@@ -56,13 +43,6 @@ static int	edf_dongle_ready(t_sim *sim, t_dongle *dongle, t_coder *coder,
 	return (rival_other->taked || now < rival_other->aviable_at_ms);
 }
 
-/*
-** A release on either lo or hi broadcasts sim->cond_progress (see
-** dongle_release). Waiting on that shared signal instead of picking
-** just one of the two dongle-specific conds means we never have to
-** guess which one to listen to - we just wake up on any relevant
-** change and re-check both.
-*/
 static void	wait_for_change(t_sim *sim, t_dongle *lo, t_dongle *hi)
 {
 	struct timespec	deadline;

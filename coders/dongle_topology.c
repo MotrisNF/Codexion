@@ -6,17 +6,12 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/17 00:00:00 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/17 00:00:00 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/18 09:17:58 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "codexion.h"
 
-/*
-** In this ring, a dongle only ever has two possible claimants: `coder`
-** and one specific neighbour. left/right never change after creation,
-** so scanning for the neighbour needs no lock.
-*/
 t_coder	*other_side(t_sim *sim, t_dongle *dongle, t_coder *coder)
 {
 	int	i;
@@ -39,11 +34,6 @@ t_dongle	*partner_dongle(t_coder *coder, t_dongle *shared)
 	return (coder->left);
 }
 
-/*
-** EDF always locks its pair in a fixed global order (ascending dongle
-** id) to avoid deadlock, instead of the odd/even alternation used by
-** FIFO.
-*/
 void	order_dongles(t_coder *coder, t_dongle **lo, t_dongle **hi)
 {
 	if (coder->left->id < coder->right->id)

@@ -6,7 +6,7 @@
 /*   By: saperez- <saperez-@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/17 00:00:00 by saperez-          #+#    #+#             */
-/*   Updated: 2026/08/17 00:00:00 by saperez-         ###   ########.fr       */
+/*   Updated: 2026/08/18 09:17:50 by saperez-         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,14 +29,6 @@ static int	add_unique(t_dongle **set, int count, t_dongle *d)
 	return (count + 1);
 }
 
-/*
-** Everything one pair-attempt might need to inspect: our own pair
-** (pair[0]=lo, pair[1]=hi), plus - for each of them - the dongle our
-** rival neighbour would need to be released from before it could
-** actually use that dongle. Locking this whole set (sorted by id) up
-** front lets us safely check whether that rival is genuinely ready,
-** not just "first in the queue".
-*/
 int	build_lock_set(t_sim *sim, t_coder *coder, t_dongle **pair,
 	t_dongle **set)
 {
