@@ -83,19 +83,20 @@ simulación igualmente, pero sin que nadie se haya agotado.
 ### Compilación
 
 ```sh
-cd coders
 make
 ```
 
-El `Makefile` genera el binario `codexion` a partir de los fuentes en
-`coders/` usando `cc` con las flags `-Wall -Wextra -Werror -pthread`, sin
-relink innecesario. Reglas disponibles: `all`, `clean`, `fclean`, `re`, `try`.
+El `Makefile` está en la raíz del proyecto y genera el binario `codexion`
+a partir de los fuentes en `coders/` usando `cc` con las flags
+`-Wall -Wextra -Werror -pthread`, sin relink innecesario. Reglas
+disponibles: `all`, `clean`, `fclean`, `re`, `try`, `race`.
 
 ```sh
 make clean   # elimina los .o
 make fclean  # elimina los .o y el binario
 make re      # fclean + all
 make try     # crea y testea el programa con unos valores de prueba
+make race    # recompila todo con ThreadSanitizer (-fsanitize=thread)
 ```
 
 ### Ejecución

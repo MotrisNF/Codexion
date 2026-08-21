@@ -15,15 +15,15 @@
 static int	check_numeric_args(char **argv)
 {
 	int		i;
-	char	*args[7];
+	char	*args[8];
 
-	args[0] = "number_of_coders";
-	args[1] = "time_to_burnout";
-	args[2] = "time_to_compile";
-	args[3] = "time_to_debug";
-	args[4] = "time_to_refactor";
-	args[5] = "number_of_compiles_required";
-	args[6] = "dongle_cooldown";
+	args[1] = "number_of_coders";
+	args[2] = "time_to_burnout";
+	args[3] = "time_to_compile";
+	args[4] = "time_to_debug";
+	args[5] = "time_to_refactor";
+	args[6] = "number_of_compiles_required";
+	args[7] = "dongle_cooldown";
 	i = 1;
 	while (i <= 7)
 	{

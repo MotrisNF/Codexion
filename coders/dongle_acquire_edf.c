@@ -48,11 +48,17 @@ static void	wait_for_change(t_sim *sim, t_dongle *lo, t_dongle *hi)
 	struct timespec	deadline;
 	long			now;
 	long			wait_ms;
+	long			hi_wait;
 
 	now = get_now_ms();
+	pthread_mutex_lock(&lo->mutex);
 	wait_ms = dongle_wait_hint(lo, now);
-	if (dongle_wait_hint(hi, now) < wait_ms)
-		wait_ms = dongle_wait_hint(hi, now);
+	pthread_mutex_unlock(&lo->mutex);
+	pthread_mutex_lock(&hi->mutex);
+	hi_wait = dongle_wait_hint(hi, now);
+	pthread_mutex_unlock(&hi->mutex);
+	if (hi_wait < wait_ms)
+		wait_ms = hi_wait;
 	pthread_mutex_lock(&sim->mutex_progress);
 	deadline_in_ms(wait_ms, &deadline);
 	pthread_cond_timedwait(&sim->cond_progress, &sim->mutex_progress,
